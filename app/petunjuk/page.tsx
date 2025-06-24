@@ -12,9 +12,19 @@ export default function PetunjukPage() {
     setLoading(false);
   }, []);
 
-  const mulaiTes = () => {
-    router.push('/exam');
-  };
+  useEffect(() => {
+  localStorage.setItem("exam_id", "0c2833c5-3b4d-4aed-955a-854eaf889f46"); // set ini di halaman login/petunjuk
+}, []);
+
+const mulaiTes = () => {
+  const examId = localStorage.getItem("exam_id");
+  if (examId) {
+    router.push(`/exam/${examId}`);
+  } else {
+    alert("Gagal menemukan ID ujian");
+  }
+};
+
 
   if (loading) {
     return <p className="text-white text-center mt-10">Memuat...</p>;

@@ -3,19 +3,22 @@
 import { useState } from 'react';
 
 type Question = {
+  id: string;
   question: string;
   options: string[];
 };
 
-const questions: Question[] = Array.from({ length: 50 }, (_, i) => ({
-  question: `Ini adalah pertanyaan nomor ${i + 1}. Apa jawaban yang benar?`,
-  options: ['Pilihan A', 'Pilihan B', 'Pilihan C', 'Pilihan D'],
-}));
+type Props = {
+  questions: Question[];
+  siswa: {
+    nama: string;
+  };
+};
 
-export default function ExamPage() {
+export default function ClientExamPage({ questions, siswa }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<(number | null)[]>(Array(50).fill(null));
-  const [doubtFlags, setDoubtFlags] = useState<boolean[]>(Array(50).fill(false));
+  const [answers, setAnswers] = useState<(number | null)[]>(Array(questions.length).fill(null));
+  const [doubtFlags, setDoubtFlags] = useState<boolean[]>(Array(questions.length).fill(false));
 
   const handleSelect = (optIndex: number) => {
     const updated = [...answers];
@@ -69,15 +72,16 @@ export default function ExamPage() {
         <div className="bg-blue-700 text-white px-6 py-4 flex justify-between items-center">
           <div className="text-lg font-semibold text-white">SISWA</div>
           <div className="text-white">
-            Selamat datang <strong>Hamida Sonia Dewi</strong> | <button
-  className="underline"
-  onClick={async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    window.location.href = '/login';
-  }}
->
-  Logout
-</button>
+            Selamat datang <strong>{siswa.nama}</strong> |{' '}
+            <button
+              className="underline"
+              onClick={async () => {
+                await fetch('/api/auth/logout', { method: 'POST' });
+                window.location.href = '/login';
+              }}
+            >
+              Logout
+            </button>
           </div>
         </div>
 
@@ -86,7 +90,9 @@ export default function ExamPage() {
           <div className="bg-white rounded shadow p-6">
             <div className="flex justify-between mb-4">
               <h3 className="text-xl font-semibold text-black">SOAL NO. {currentIndex + 1}</h3>
-              <div className="text-sm bg-gray-200 px-3 py-1 rounded text-black">SISA WAKTU 01:13:23</div>
+              <div className="text-sm bg-gray-200 px-3 py-1 rounded text-black">
+                SISA WAKTU 01:13:23
+              </div>
             </div>
 
             <p className="mb-4 text-black">{questions[currentIndex].question}</p>
@@ -134,4 +140,3 @@ export default function ExamPage() {
     </div>
   );
 }
-
