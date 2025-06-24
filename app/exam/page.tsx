@@ -69,7 +69,15 @@ export default function ExamPage() {
         <div className="bg-blue-700 text-white px-6 py-4 flex justify-between items-center">
           <div className="text-lg font-semibold text-white">SISWA</div>
           <div className="text-white">
-            Selamat datang <strong>Hamida Sonia Dewi</strong> | <button className="underline">Logout</button>
+            Selamat datang <strong>Hamida Sonia Dewi</strong> | <button
+  className="underline"
+  onClick={async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.href = '/login';
+  }}
+>
+  Logout
+</button>
           </div>
         </div>
 

@@ -1,13 +1,12 @@
-// src/app/api/auth/login/route.ts
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import postgres from 'postgres';
 
 const sql = postgres(process.env.POSTGRES_URL!, {
   ssl: { rejectUnauthorized: false },
 });
 
-// API untuk login berdasarkan token siswa
-export async function POST(req) {
+export async function POST(req: NextRequest) {
   try {
     const { token } = await req.json();
 
@@ -15,7 +14,7 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Token harus diisi' }, { status: 400 });
     }
 
-    // Cek siswa berdasarkan token
+    // Cari siswa berdasarkan token
     const siswa = await sql`
       SELECT siswa.id, siswa.nama, siswa.nisn, peserta_sesi.sesi_id
       FROM peserta_sesi
@@ -28,8 +27,30 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Token tidak ditemukan' }, { status: 404 });
     }
 
-    return NextResponse.json({ siswa: siswa[0] });
-  } catch (error) {
+    const siswaData = siswa[0];
+
+    // Buat response dan set cookie
+    const response = NextResponse.json({ siswa: siswaData });
+
+    response.cookies.set('token', token, {
+      httpOnly: true,
+      path: '/',
+      maxAge: 60 * 60 * 2, // 2 jam
+    });
+
+    response.cookies.set('siswaId', siswaData.id.toString(), {
+      path: '/',
+      maxAge: 60 * 60 * 2,
+    });
+
+    response.cookies.set('sesiId', siswaData.sesi_id.toString(), {
+      path: '/',
+      maxAge: 60 * 60 * 2,
+    });
+
+    return response;
+
+  } catch (error: any) {
     console.error(error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
