@@ -33,7 +33,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     }
 
     const soal = await sql`
-  SELECT soal_sesi.id, soal_sesi.sesi_id, soal_sesi.master_soal_id, master_soal.soal_text, master_soal.nomor_soal, master_soal.options
+  SELECT soal_sesi.id, soal_sesi.sesi_id, soal_sesi.master_soal_id,
+         master_soal.soal_text, master_soal.nomor_soal,
+         master_soal.options, master_soal.durasi_menit
   FROM soal_sesi
   JOIN master_soal ON soal_sesi.master_soal_id = master_soal.id
   WHERE soal_sesi.sesi_id = ${siswaData.sesi_id}
@@ -44,9 +46,16 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       question: item.soal_text,
       options: item.options.split('|'),
       nomor_soal: item.nomor_soal,
+      durasi: item.durasi_menit,
     }));
 
-    return NextResponse.json({ siswa: siswaData, soal: formatted });
+    const totalDurasi = soal.reduce((acc, item) => acc + item.durasi_menit, 0);
+
+    return NextResponse.json({
+      siswa: siswaData,
+      soal: formatted,
+      totalDurasiMenit: totalDurasi,
+    });
 
   } catch (error: any) {
     console.error(error);

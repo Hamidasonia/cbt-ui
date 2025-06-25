@@ -18,6 +18,7 @@ export default function ExamPage() {
   const [siswa, setSiswa] = useState<{ nama: string } | null>(null);
   const [showNomorSoal, setShowNomorSoal] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<number>(0); // in seconds
 
   useEffect(() => {
     const fetchQuestions = async () => {
@@ -39,6 +40,8 @@ export default function ExamPage() {
           throw new Error(data.error || 'Format data tidak sesuai');
         }
 
+        setTimeLeft(data.totalDurasiMenit * 60);
+
         setSiswa(data.siswa);
         setQuestions(data.soal);
         setAnswers(Array(data.soal.length).fill(null));
@@ -52,6 +55,21 @@ export default function ExamPage() {
 
     fetchQuestions();
   }, []);
+
+//   useEffect(() => {
+//   if (timeLeft <= 0) {
+//     // Waktu habis → redirect otomatis
+//     window.location.href = '/petunjuk';
+//     return;
+//   }
+
+//   const timer = setInterval(() => {
+//     setTimeLeft((prev) => prev - 1);
+//   }, 1000);
+
+//   return () => clearInterval(timer);
+// }, [timeLeft]);
+
 
   const handleSelect = (optIndex: number) => {
     const updated = [...answers];
@@ -70,6 +88,13 @@ export default function ExamPage() {
     if (answers[index] !== null) return 'bg-blue-600';
     return 'bg-gray-300';
   };
+
+  function formatTime(seconds: number) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
 
   if (loading) return <div className="p-10 text-black">Memuat soal...</div>;
   if (!questions.length) return <div className="p-10 text-black">Tidak ada soal ditemukan.</div>;
@@ -137,7 +162,7 @@ export default function ExamPage() {
         <div className="w-full md:w-64 p-4 bg-white rounded">
           <p className="font-semibold text-gray-700 mb-1 text-center">Waktu Tes</p>
           <div className="bg-white border-2 border-gray-300 rounded p-4 text-center mb-4">
-            <div className="font-mono text-2xl bg-white text-black py-2 rounded">00:59:35</div>
+            <div className="font-mono text-2xl bg-white text-black py-2 rounded">{formatTime(timeLeft)}</div>
           </div>
 
           {/* Tombol Cek Soal hanya muncul di mobile */}
@@ -188,7 +213,7 @@ export default function ExamPage() {
                 Soal No. {questions[currentIndex].nomor_soal}
               </h3>
               <div className="text-sm bg-gray-200 px-3 py-1 rounded text-black font-mono">
-                SISA WAKTU 00:59:35
+                SISA WAKTU {formatTime(timeLeft)}
               </div>
             </div>
 
