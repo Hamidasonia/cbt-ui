@@ -1,21 +1,57 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type Question = {
+  id: number;
   question: string;
   options: string[];
+  nomor_soal: string;
 };
 
-const questions: Question[] = Array.from({ length: 50 }, (_, i) => ({
-  question: `Ini adalah pertanyaan nomor ${i + 1}. Apa jawaban yang benar?`,
-  options: ['Pilihan A', 'Pilihan B', 'Pilihan C', 'Pilihan D'],
-}));
-
 export default function ExamPage() {
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<(number | null)[]>(Array(50).fill(null));
-  const [doubtFlags, setDoubtFlags] = useState<boolean[]>(Array(50).fill(false));
+  const [answers, setAnswers] = useState<(number | null)[]>([]);
+  const [doubtFlags, setDoubtFlags] = useState<boolean[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [siswa, setSiswa] = useState<{ nama: string } | null>(null);
+  const [showNomorSoal, setShowNomorSoal] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      try {
+        const sesiId = document.cookie
+          .split('; ')
+          .find((row) => row.startsWith('sesiId='))
+          ?.split('=')[1];
+
+        if (!sesiId) {
+          console.error('Sesi ID tidak ditemukan di cookie');
+          return;
+        }
+
+        const res = await fetch(`/api/exam/${sesiId}`);
+        const data = await res.json();
+
+        if (!res.ok || !Array.isArray(data.soal)) {
+          throw new Error(data.error || 'Format data tidak sesuai');
+        }
+
+        setSiswa(data.siswa);
+        setQuestions(data.soal);
+        setAnswers(Array(data.soal.length).fill(null));
+        setDoubtFlags(Array(data.soal.length).fill(false));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchQuestions();
+  }, []);
 
   const handleSelect = (optIndex: number) => {
     const updated = [...answers];
@@ -30,63 +66,130 @@ export default function ExamPage() {
   };
 
   const getStatusColor = (index: number) => {
-    if (answers[index] !== null && doubtFlags[index]) return 'bg-orange-400';
-    if (answers[index] !== null) return 'bg-green-500';
-    return 'bg-gray-400';
+    if (answers[index] !== null && doubtFlags[index]) return 'bg-yellow-400';
+    if (answers[index] !== null) return 'bg-blue-600';
+    return 'bg-gray-300';
   };
 
-  return (
-    <div className="flex min-h-screen bg-gray-100">
-      {/* Sidebar */}
-      <div className="w-64 p-4 bg-white border-r">
-        <h2 className="text-lg font-semibold mb-4 text-black">NOMOR SOAL</h2>
-        <div className="grid grid-cols-5 gap-2">
-          {questions.map((_, index) => (
-            <button
-              key={index}
-              className={`w-10 h-10 rounded text-white font-bold ${getStatusColor(index)} ${
-                currentIndex === index ? 'ring-2 ring-blue-500' : ''
-              }`}
-              onClick={() => setCurrentIndex(index)}
-            >
-              {index + 1}
-            </button>
-          ))}
-        </div>
-        <div className="mt-6 text-sm text-black">
-          <div><span className="inline-block w-4 h-4 bg-green-500 mr-2" /> Sudah dijawab</div>
-          <div><span className="inline-block w-4 h-4 bg-orange-400 mr-2" /> Ragu-ragu</div>
-          <div><span className="inline-block w-4 h-4 bg-gray-400 mr-2" /> Belum dijawab</div>
-        </div>
-        <button className="mt-6 bg-red-500 text-white py-2 px-4 w-full rounded">
-          Hentikan Ujian
-        </button>
-      </div>
+  if (loading) return <div className="p-10 text-black">Memuat soal...</div>;
+  if (!questions.length) return <div className="p-10 text-black">Tidak ada soal ditemukan.</div>;
 
-      {/* Main */}
-      <div className="flex-1 flex flex-col">
-        {/* Topbar */}
-        <div className="bg-blue-700 text-white px-6 py-4 flex justify-between items-center">
-          <div className="text-lg font-semibold text-white">SISWA</div>
-          <div className="text-white">
-            Selamat datang <strong>Hamida Sonia Dewi</strong> | <button
-  className="underline"
-  onClick={async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    window.location.href = '/login';
-  }}
->
-  Logout
-</button>
+  return (
+    <div className="flex flex-col min-h-screen">
+      {showModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          {/* Background Overlay */}
+          <div
+            className="absolute inset-0 bg-black opacity-40"
+            onClick={() => setShowModal(false)}
+          ></div>
+
+          {/* Modal Box */}
+          <div className="relative bg-white rounded-md p-6 shadow-lg w-[90%] max-w-md text-center z-10 border border-gray-300">
+            <h2 className="text-lg font-bold text-black mb-2">
+              Apakah Anda yakin ingin menyelesaikan tes ini?
+            </h2>
+            <p className="text-sm text-gray-700 mb-4">
+              <strong>Pastikan semua jawaban sudah terjawab.</strong><br />
+              Setelah mengklik tombol <strong>"Selesai"</strong>, Anda tidak bisa mengubah jawaban lagi.
+            </p>
+            <div className="flex justify-center gap-4 mt-4">
+              <button
+                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded"
+                onClick={() => setShowModal(false)}
+              >
+                ❮ Kembali
+              </button>
+              <button
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+                onClick={() => {
+                  // Lakukan submit atau redirect di sini
+                  window.location.href = '/selesai';
+                }}
+              >
+                ✔ Selesai
+              </button>
+            </div>
           </div>
         </div>
+      )}
 
-        {/* Soal */}
-        <div className="flex-1 p-6">
+      {/* AppBar atas */}
+      <div className="bg-[#050038] text-white px-6 py-4 flex justify-between items-center w-full">
+        <div className="text-lg font-light">QQNuansa <span className="font-bold">Consultant</span></div>
+        <div>
+          Halo, <strong>{siswa?.nama}</strong> |{' '}
+          <button
+            onClick={async () => {
+              await fetch('/api/auth/logout', { method: 'POST' });
+              window.location.href = '/login';
+            }}
+            className="underline"
+          >
+            Logout
+          </button>
+        </div>
+      </div>
+
+      {/* Body utama */}
+      <div className="flex flex-1 flex-col md:flex-row px-2 md:px-4 py-4 gap-4 bg-[#D9D9D9]">
+        {/* Sidebar kiri */}
+        <div className="w-full md:w-64 p-4 bg-white rounded">
+          <p className="font-semibold text-gray-700 mb-1 text-center">Waktu Tes</p>
+          <div className="bg-white border-2 border-gray-300 rounded p-4 text-center mb-4">
+            <div className="font-mono text-2xl bg-white text-black py-2 rounded">00:59:35</div>
+          </div>
+
+          {/* Tombol Cek Soal hanya muncul di mobile */}
+          <div className="md:hidden text-center mb-4">
+            <button
+              onClick={() => setShowNomorSoal(!showNomorSoal)}
+              className="bg-blue-600 text-white px-4 py-2 rounded"
+            >
+              {showNomorSoal ? 'Sembunyikan' : 'Cek Soal'}
+            </button>
+          </div>
+
+          {/* Nomor Soal: sembunyi di mobile kalau belum dibuka */}
+          {(showNomorSoal || typeof window !== 'undefined' && window.innerWidth >= 768) && (
+            <>
+              <h2 className="text-md font-semibold mb-2 text-black">Nomor Soal</h2>
+              <div className="grid grid-cols-5 gap-2">
+                {questions.map((_, index) => (
+                  <button
+                    key={index}
+                    className={`w-8 h-8 rounded text-white text-sm font-bold ${getStatusColor(index)} ${currentIndex === index ? 'ring-2 ring-blue-500' : ''}`}
+                    onClick={() => setCurrentIndex(index)}
+                  >
+                    {index + 1}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-4 text-xs text-black space-y-1">
+                <div><span className="inline-block w-3 h-3 bg-green-500 mr-2 rounded-sm" /> Sudah Dijawab</div>
+                <div><span className="inline-block w-3 h-3 bg-orange-400 mr-2 rounded-sm" /> Ragu-ragu</div>
+                <div><span className="inline-block w-3 h-3 bg-gray-400 mr-2 rounded-sm" /> Belum Dijawab</div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Konten soal */}
+        <div className="flex-1">
+          {/* Container judul */}
+          <div className="bg-[#050038] text-white text-center py-3 rounded-t-md">
+            <h2 className="text-lg font-semibold">Soal Ujian</h2>
+          </div>
+
           <div className="bg-white rounded shadow p-6">
             <div className="flex justify-between mb-4">
-              <h3 className="text-xl font-semibold text-black">SOAL NO. {currentIndex + 1}</h3>
-              <div className="text-sm bg-gray-200 px-3 py-1 rounded text-black">SISA WAKTU 01:13:23</div>
+              <h3 className="text-lg font-semibold text-black">
+                Soal No. {questions[currentIndex].nomor_soal}
+              </h3>
+              <div className="text-sm bg-gray-200 px-3 py-1 rounded text-black font-mono">
+                SISA WAKTU 00:59:35
+              </div>
             </div>
 
             <p className="mb-4 text-black">{questions[currentIndex].question}</p>
@@ -104,34 +207,42 @@ export default function ExamPage() {
               ))}
             </div>
 
-            <div className="mt-6 flex justify-between">
+            <div className="mt-6 flex justify-between gap-2 flex-wrap">
               <button
-                className="bg-blue-500 text-white px-4 py-2 rounded"
+                className="bg-blue-600 text-white px-4 py-2 rounded disabled:bg-blue-300"
                 disabled={currentIndex === 0}
                 onClick={() => setCurrentIndex((i) => i - 1)}
               >
-                ❮ SOAL SEBELUMNYA
+                ❮ Soal Sebelumnya
               </button>
 
               <button
-                className="bg-orange-400 text-white px-4 py-2 rounded"
+                className="bg-yellow-400 text-black px-4 py-2 rounded"
                 onClick={toggleDoubt}
               >
-                RAGU-RAGU
+                Ragu-Ragu
               </button>
 
-              <button
-                className="bg-blue-500 text-white px-4 py-2 rounded"
-                disabled={currentIndex === questions.length - 1}
-                onClick={() => setCurrentIndex((i) => i + 1)}
-              >
-                SOAL SELANJUTNYA ❯
-              </button>
+              {currentIndex === questions.length - 1 ? (
+                <button
+                  className="bg-green-600 text-white px-4 py-2 rounded"
+                  onClick={() => setShowModal(true)}
+                >
+                  Selesai ❯
+                </button>
+              ) : (
+                <button
+                  className="bg-blue-600 text-white px-4 py-2 rounded disabled:bg-blue-300"
+                  onClick={() => setCurrentIndex((i) => i + 1)}
+                >
+                  Soal Selanjutnya ❯
+                </button>
+              )}
             </div>
           </div>
         </div>
       </div>
     </div>
+
   );
 }
-

@@ -1,50 +1,55 @@
-// src/app/api/exam/[id]/route.ts
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import postgres from 'postgres';
 
 const sql = postgres(process.env.POSTGRES_URL!, {
   ssl: { rejectUnauthorized: false },
 });
 
-// src/app/api/exam/[id]/route.ts
-export async function GET(req, { params }) {
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    // Cek authorization
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    const token = authHeader.split('Bearer ')[1];
+    const token = req.cookies.get('token')?.value;
+
     if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized (no token)' }, { status: 401 });
     }
 
-    // Cek siswa berdasarkan token
-    const siswa = (await sql`
+    const siswa = await sql`
       SELECT siswa.id, siswa.nama, siswa.nisn, peserta_sesi.sesi_id
       FROM peserta_sesi
       JOIN siswa ON siswa.id = peserta_sesi.siswa_id
       WHERE peserta_sesi.token = ${token}
       LIMIT 1
-    `)[0 ];
+    `;
 
-    if (!siswa) {
+    if (siswa.length === 0) {
       return NextResponse.json({ error: 'Siswa tidak ditemukan' }, { status: 404 });
     }
 
-    // Mengirim sesi yang sesuai saja
-    if (siswa.sesi_id.toString() !== params.id.toString()) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const siswaData = siswa[0];
+
+    if (siswaData.sesi_id.toString() !== params.id.toString()) {
+      return NextResponse.json({ error: 'Forbidden (wrong session)' }, { status: 403 });
     }
 
-    // Mengirim soal dan siswa yang sesuai
-    // (sama seperti yang diberikan di GET yang sebelumnya)
-    //...
-  } catch (error) {
+    const soal = await sql`
+  SELECT soal_sesi.id, soal_sesi.sesi_id, soal_sesi.master_soal_id, master_soal.soal_text, master_soal.nomor_soal, master_soal.options
+  FROM soal_sesi
+  JOIN master_soal ON soal_sesi.master_soal_id = master_soal.id
+  WHERE soal_sesi.sesi_id = ${siswaData.sesi_id}
+`;
+
+    const formatted = soal.map((item) => ({
+      id: item.id,
+      question: item.soal_text,
+      options: item.options.split('|'),
+      nomor_soal: item.nomor_soal,
+    }));
+
+    return NextResponse.json({ siswa: siswaData, soal: formatted });
+
+  } catch (error: any) {
     console.error(error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
-
-
-
