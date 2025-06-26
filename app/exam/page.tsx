@@ -7,12 +7,15 @@ type Question = {
   question: string;
   options: string[];
   nomor_soal: string;
+  tipe_jawaban: 'pilihan_ganda' | 'essai';
+  soal_id: string;
 };
 
 export default function ExamPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<(number | null)[]>([]);
+  // const [answers, setAnswers] = useState<(number | null)[]>([]);
+  const [answers, setAnswers] = useState<(number | string | null)[]>([]);
   const [doubtFlags, setDoubtFlags] = useState<boolean[]>([]);
   const [loading, setLoading] = useState(true);
   const [siswa, setSiswa] = useState<{ nama: string } | null>(null);
@@ -56,19 +59,19 @@ export default function ExamPage() {
     fetchQuestions();
   }, []);
 
-//   useEffect(() => {
-//   if (timeLeft <= 0) {
-//     // Waktu habis → redirect otomatis
-//     window.location.href = '/petunjuk';
-//     return;
-//   }
+  //   useEffect(() => {
+  //   if (timeLeft <= 0) {
+  //     // Waktu habis → redirect otomatis
+  //     window.location.href = '/petunjuk';
+  //     return;
+  //   }
 
-//   const timer = setInterval(() => {
-//     setTimeLeft((prev) => prev - 1);
-//   }, 1000);
+  //   const timer = setInterval(() => {
+  //     setTimeLeft((prev) => prev - 1);
+  //   }, 1000);
 
-//   return () => clearInterval(timer);
-// }, [timeLeft]);
+  //   return () => clearInterval(timer);
+  // }, [timeLeft]);
 
 
   const handleSelect = (optIndex: number) => {
@@ -90,10 +93,10 @@ export default function ExamPage() {
   };
 
   function formatTime(seconds: number) {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
 
 
   if (loading) return <div className="p-10 text-black">Memuat soal...</div>;
@@ -127,13 +130,40 @@ export default function ExamPage() {
               </button>
               <button
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
-                onClick={() => {
-                  // Lakukan submit atau redirect di sini
-                  window.location.href = '/selesai';
+                onClick={async () => {
+                  const sesiId = document.cookie
+                    .split('; ')
+                    .find((row) => row.startsWith('sesiId='))
+                    ?.split('=')[1];
+
+                  if (!sesiId) return alert('Sesi ID tidak ditemukan');
+
+                  const jawabanPayload = questions.map((q, index) => ({
+                    soal_sesi_id: q.soal_id,
+                    jawaban_index: answers[index], // untuk pilihan ganda
+                    jawaban_text: null, // bisa diganti jika ada tipe esai
+                  }));
+
+                  const res = await fetch('/api/jawaban/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      sesi_id: sesiId,
+                      jawaban: jawabanPayload,
+                    }),
+                  });
+
+                  if (res.ok) {
+                    window.location.href = '/selesai';
+                  } else {
+                    const err = await res.json();
+                    alert('Gagal menyimpan jawaban: ' + err.error);
+                  }
                 }}
               >
                 ✔ Selesai
               </button>
+
             </div>
           </div>
         </div>
@@ -218,19 +248,35 @@ export default function ExamPage() {
             </div>
 
             <p className="mb-4 text-black">{questions[currentIndex].question}</p>
-            <div className="space-y-3">
-              {questions[currentIndex].options.map((opt, i) => (
-                <label key={i} className="flex items-center space-x-2 text-black">
-                  <input
-                    type="radio"
-                    name={`question-${currentIndex}`}
-                    checked={answers[currentIndex] === i}
-                    onChange={() => handleSelect(i)}
-                  />
-                  <span>{opt}</span>
-                </label>
-              ))}
-            </div>
+
+            {questions[currentIndex].tipe_jawaban === 'pilihan_ganda' ? (
+              <div className="space-y-3">
+                {questions[currentIndex].options.map((opt, i) => (
+                  <label key={i} className="flex items-center space-x-2 text-black">
+                    <input
+                      type="radio"
+                      name={`question-${currentIndex}`}
+                      checked={answers[currentIndex] === i}
+                      onChange={() => handleSelect(i)}
+                    />
+                    <span>{opt}</span>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <textarea
+                value={(answers[currentIndex] as string) || ''}
+                onChange={(e) => {
+                  const updated = [...answers];
+                  updated[currentIndex] = e.target.value;
+                  setAnswers(updated);
+                }}
+                rows={4}
+                className="w-full border border-gray-300 p-2 rounded text-black"
+                placeholder="Tulis jawaban esai Anda di sini..."
+              />
+            )}
+
 
             <div className="mt-6 flex justify-between gap-2 flex-wrap">
               <button
